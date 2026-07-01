@@ -1,1 +1,1063 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WuppTrade</title>
+    <style>
+        :root {
+            --bg-main: #06090e;       
+            --bg-card: #111722;       
+            --bg-input: #182030;      
+            --border-color: #1c2638;  
+            --text-main: #ffffff;
+            --text-muted: #64748b;
+            
+            --candle-green: #26a69a;
+            --candle-red: #ef5350;
+            --accent: #222d42;
+            --chart-neutral: #cbd5e1;
+        }
 
+        body.light-mode {
+            --bg-main: #f1f5f9;
+            --bg-card: #ffffff;
+            --bg-input: #e8edf4;
+            --border-color: #dbe2ec;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+
+            --candle-green: #0e9888;
+            --candle-red: #e0433f;
+            --accent: #dde4ee;
+            --chart-neutral: #94a3b8;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+        body { background-color: var(--bg-main); color: var(--text-main); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; overflow: hidden; }
+
+        .dashboard-container { width: 100%; max-width: 1440px; height: 860px; background-color: var(--bg-main); border-radius: 24px; border: 1px solid var(--border-color); box-shadow: 0 50px 120px rgba(0, 0, 0, 0.8); display: flex; flex-direction: column; overflow: hidden; }
+
+        /* Top Bar */
+        .top-navbar { height: 74px; border-bottom: 1px solid var(--border-color); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; background-color: rgba(17, 23, 34, 0.6); backdrop-filter: blur(20px); flex-shrink: 0; }
+        .brand-logo { font-size: 20px; font-weight: 800; letter-spacing: -0.6px; display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, #fff 70%, var(--text-muted)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .brand-logo::before { content: ''; width: 12px; height: 12px; background: linear-gradient(135deg, var(--candle-green), #4db6ac); border-radius: 3px; }
+        .nav-links { display: flex; gap: 12px; margin-left: 40px; }
+        .nav-btn { background: none; border: none; color: var(--text-muted); font-size: 14px; font-weight: 600; padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .nav-btn.active, .nav-btn:hover { color: var(--text-main); background-color: var(--bg-input); }
+        .global-portfolio { display: flex; gap: 36px; margin-left: auto; }
+        .portfolio-stat { display: flex; flex-direction: column; align-items: flex-end; }
+        .stat-label { font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; letter-spacing: 0.8px; }
+        .stat-value { font-size: 20px; font-weight: 700; margin-top: 2px; }
+
+        .main-content { flex-grow: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+
+        /* VIEWS */
+        .view-section { display: none; height: 100%; flex-direction: column; }
+        .view-section.active { display: flex; }
+
+        /* VIEW: MARKET & HISTORY */
+        .view-padded { padding: 24px; overflow-y: auto; }
+        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .view-title { font-size: 24px; font-weight: 800; }
+        
+        .market-tabs { display: flex; background-color: rgba(24, 32, 48, 0.6); padding: 4px; border-radius: 12px; }
+        .tab-btn { background: none; border: none; color: var(--text-muted); padding: 8px 18px; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .tab-btn.active { background-color: var(--bg-card); color: var(--text-main); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
+
+        .scroll-list { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-bottom: 20px; }
+        .scroll-list::-webkit-scrollbar { width: 6px; }
+        .scroll-list::-webkit-scrollbar-thumb { background: #1c2638; border-radius: 10px; }
+
+        .row-card { background-color: var(--bg-card); border: 1px solid rgba(255, 255, 255, 0.01); padding: 14px 20px; border-radius: 14px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.15s ease; }
+        .row-card:hover { border-color: var(--border-color); background-color: var(--bg-input); transform: scale(1.002); }
+        .row-identity { display: flex; flex-direction: column; gap: 2px; }
+        .row-ticker { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .row-name { font-size: 13px; color: var(--text-muted); }
+        .row-mini-data { display: flex; align-items: center; gap: 40px; }
+        .row-live-price { font-size: 16px; font-weight: 600; text-align: right; min-width: 100px; }
+        .row-change-badge { padding: 5px 12px; border-radius: 8px; font-size: 13px; font-weight: 700; text-align: center; min-width: 85px; }
+
+        .badge-up { background-color: rgba(38, 166, 154, 0.12); color: var(--candle-green); }
+        .badge-down { background-color: rgba(239, 83, 80, 0.12); color: var(--candle-red); }
+        .badge-neutral { background-color: rgba(255, 255, 255, 0.05); color: var(--text-muted); }
+        .empty-state { text-align: center; color: var(--text-muted); padding: 80px 0; font-size: 15px; }
+
+        /* VIEW: TRADING */
+        #trading-view.active { display: grid; grid-template-columns: minmax(0, 1fr) 400px; }
+        .chart-section { display: flex; flex-direction: column; border-right: 1px solid var(--border-color); height: 100%; min-width: 0; overflow: hidden; }
+        .chart-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 4px 18px; flex-shrink: 0; }
+        .chart-header-left { display: flex; align-items: center; gap: 16px; }
+        .back-button { background-color: var(--bg-input); border: 1px solid rgba(255, 255, 255, 0.05); color: var(--text-main); padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
+        .back-button:hover { background-color: var(--accent); }
+        
+        .speed-selector { display: flex; align-items: center; gap: 8px; background: var(--bg-input); border-radius: 8px; padding: 6px 12px; }
+        .speed-label { color: var(--text-muted); font-size: 12px; font-weight: 700; }
+        .speed-value { color: var(--text-main); font-size: 12px; font-weight: 700; min-width: 22px; text-align: right; }
+        #speedSlider { -webkit-appearance: none; appearance: none; width: 90px; height: 4px; border-radius: 2px; background: #2a3344; outline: none; cursor: pointer; }
+        #speedSlider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--candle-green); cursor: pointer; }
+        #speedSlider::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--candle-green); border: none; cursor: pointer; }
+
+        .settings-gear-btn { background-color: var(--bg-input); border: 1px solid rgba(255, 255, 255, 0.05); color: var(--text-muted); width: 38px; height: 38px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-left: 16px; flex-shrink: 0; transition: 0.2s; }
+        .settings-gear-btn:hover { color: var(--text-main); background-color: var(--accent); transform: rotate(25deg); }
+
+        .settings-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(4px); z-index: 200; align-items: center; justify-content: center; }
+        .settings-overlay.active { display: flex; }
+        .settings-modal { width: 380px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 18px; padding: 22px; box-shadow: 0 30px 80px rgba(0,0,0,0.5); }
+        .settings-modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+        .settings-modal-title { font-size: 18px; font-weight: 800; color: var(--text-main); }
+        .settings-close-btn { background: none; border: none; color: var(--text-muted); font-size: 22px; cursor: pointer; line-height: 1; padding: 4px; }
+        .settings-close-btn:hover { color: var(--text-main); }
+        .settings-group { margin-bottom: 18px; }
+        .settings-group:last-child { margin-bottom: 0; }
+        .settings-group-label { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+        .settings-toggle-row { display: flex; gap: 8px; background: var(--bg-input); padding: 4px; border-radius: 12px; }
+        .settings-option-btn { flex: 1; background: none; border: none; color: var(--text-muted); padding: 10px 12px; border-radius: 9px; font-size: 13px; font-weight: 700; cursor: pointer; transition: 0.2s; }
+        .settings-option-btn.active { background: var(--bg-card); color: var(--text-main); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); }
+
+        .active-stock-info { text-align: right; }
+        .active-ticker { font-size: 24px; font-weight: 800; }
+        .active-name { font-size: 13px; color: var(--text-muted); margin-top: 1px; }
+
+        .chart-container-relative { flex-grow: 1; position: relative; display: flex; flex-direction: column; overflow: hidden; padding: 0; cursor: grab; }
+        #candlestickCanvas { display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+        .canvas-wrapper { flex-grow: 1; overflow-x: auto; overflow-y: hidden; position: relative; z-index: 2; user-select: none; }
+        .canvas-wrapper:active { cursor: grabbing; }
+        .canvas-wrapper::-webkit-scrollbar { height: 6px; }
+        .canvas-wrapper::-webkit-scrollbar-thumb { background: #1c2638; border-radius: 10px; }
+
+        /* Order Terminal Panel */
+        .order-panel { background-color: var(--bg-main); border-left: 1px solid var(--border-color); padding: 24px; display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0; z-index: 3; gap: 20px; }
+        .panel-title { font-size: 18px; font-weight: 800; }
+        
+        .position-box { background-color: var(--bg-card); border: 1px solid rgba(255, 255, 255, 0.03); padding: 14px; border-radius: 12px; display: flex; justify-content: space-between; position: relative; overflow: hidden; }
+        .pos-type-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+        .pos-type-bar.LONG { background-color: var(--candle-green); }
+        .pos-type-bar.SHORT { background-color: var(--candle-red); }
+
+        .trade-input-group { display: flex; flex-direction: column; gap: 8px; }
+        .trade-input-wrapper { display: flex; align-items: center; background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 10px 16px; }
+        .trade-input-wrapper input { background: none; border: none; color: var(--text-main); font-size: 16px; font-weight: 700; width: 100%; outline: none; }
+        .trade-input-wrapper span { color: var(--text-muted); font-weight: 700; font-size: 13px; margin-left: 10px; }
+        
+        .preset-container { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+        .leverage-container { grid-template-columns: repeat(4, 1fr); }
+        .preset-btn { background-color: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); padding: 6px 0; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+        .preset-btn:hover { background-color: var(--bg-input); border-color: #38486b; }
+        .preset-btn.active { background-color: #ffffff; color: #000000; border-color: #ffffff; }
+
+        .sl-tp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+        .summary-box { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px dashed var(--border-color); }
+        .order-summary-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-muted); font-weight: 500; }
+        
+        .action-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: auto; padding-top: 20px;}
+        .trade-btn { border: none; padding: 16px; border-radius: 14px; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .trade-btn span { font-size: 11px; opacity: 0.7; font-weight: 600; text-transform: uppercase; }
+        .trade-btn:active { transform: scale(0.96); }
+        .btn-buy { background-color: var(--candle-green); color: #fff; box-shadow: 0 4px 18px rgba(38, 166, 154, 0.15); }
+        .btn-sell { background-color: var(--candle-red); color: #fff; box-shadow: 0 4px 18px rgba(239, 83, 80, 0.15); }
+
+        .up { color: var(--candle-green) !important; }
+        .down { color: var(--candle-red) !important; }
+        .neutral { color: var(--text-muted) !important; }
+
+        /* Toast Container */
+        #toast-container { position: fixed; bottom: 30px; right: 30px; z-index: 9999; display: flex; flex-direction: column; gap: 12px; pointer-events: none; }
+        .toast { background-color: var(--bg-card); border-left: 4px solid; padding: 16px 20px; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500; animation: slideIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; min-width: 280px; }
+        .toast.success { border-color: var(--candle-green); }
+        .toast.error { border-color: var(--candle-red); }
+        .toast.info { border-color: #3b82f6; }
+        @keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-container">
+        <div class="top-navbar">
+            <div class="brand-logo">WuppTrade</div>
+            <div class="nav-links">
+                <button class="nav-btn active" id="nav-markets" onclick="switchMainTab('MARKETS')">Märkte</button>
+                <button class="nav-btn" id="nav-history" onclick="switchMainTab('HISTORY')">Historie</button>
+            </div>
+            <div class="global-portfolio">
+                <div class="portfolio-stat">
+                    <div class="stat-label" id="dynamic-perf-label">Gesamtrendite Depot</div>
+                    <div class="stat-value" id="dynamic-perf-value">0,00 € (0,00%)</div>
+                </div>
+                <div class="portfolio-stat">
+                    <div class="stat-label">Verfügbares Cash</div>
+                    <div class="stat-value" id="global-cash">5.000,00 €</div>
+                </div>
+            </div>
+            <button class="settings-gear-btn" id="settingsGearBtn" onclick="openSettings()" title="Einstellungen">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
+        </div>
+
+        <!-- SETTINGS MODAL -->
+        <div class="settings-overlay" id="settingsOverlay" onclick="if(event.target===this) closeSettings()">
+            <div class="settings-modal">
+                <div class="settings-modal-header">
+                    <div class="settings-modal-title">Einstellungen</div>
+                    <button class="settings-close-btn" onclick="closeSettings()">&times;</button>
+                </div>
+
+                <div class="settings-group">
+                    <div class="settings-group-label">Darstellung</div>
+                    <div class="settings-toggle-row">
+                        <button class="settings-option-btn active" id="theme-dark" onclick="setTheme('dark')">🌙 Dark Mode</button>
+                        <button class="settings-option-btn" id="theme-light" onclick="setTheme('light')">☀️ Light Mode</button>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <div class="settings-group-label">Diagramm-Typ</div>
+                    <div class="settings-toggle-row">
+                        <button class="settings-option-btn active" id="chart-candles" onclick="setChartType('candles')">📊 Kerzen</button>
+                        <button class="settings-option-btn" id="chart-line" onclick="setChartType('line')">📈 Linie</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            
+            <!-- MARKET VIEW -->
+            <div class="view-section active view-padded" id="view-markets">
+                <div class="header-row">
+                    <div class="view-title">Märkte</div>
+                    <div class="market-tabs">
+                        <button class="tab-btn active" id="tab-all" onclick="changeMarketTab('ALL')">Alle Märkte</button>
+                        <button class="tab-btn" id="tab-owned" onclick="changeMarketTab('OWNED')">Offene Positionen</button>
+                    </div>
+                </div>
+                <div class="scroll-list" id="market-list-container"></div>
+                <div class="empty-state" id="market-empty-state">Keine offenen Positionen.</div>
+            </div>
+
+            <!-- HISTORY VIEW -->
+            <div class="view-section view-padded" id="view-history">
+                <div class="header-row">
+                    <div class="view-title">Order Historie</div>
+                </div>
+                <div class="scroll-list" id="history-list-container"></div>
+                <div class="empty-state" id="history-empty-state">Noch keine abgeschlossenen Trades.</div>
+            </div>
+
+            <!-- TRADING VIEW -->
+            <div class="view-section" id="trading-view">
+                <div class="chart-section">
+                    <div class="chart-header">
+                        <div class="chart-header-left">
+                            <button class="back-button" onclick="switchMainTab('MARKETS')">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                                Zurück
+                            </button>
+                            <div class="speed-selector">
+                                <span class="speed-label">Speed</span>
+                                <input type="range" id="speedSlider" min="1" max="10" value="5" step="1" oninput="setGameSpeed(this.value)">
+                                <span class="speed-value" id="speedValue">5x</span>
+                            </div>
+                        </div>
+                        <div class="active-stock-info">
+                            <div class="active-ticker" id="chart-ticker">---</div>
+                            <div class="active-name" id="chart-name">---</div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-container-relative" id="chartArea">
+                        <canvas id="candlestickCanvas"></canvas>
+                        <div class="canvas-wrapper" id="canvasWrapper" onscroll="handleChartScroll()">
+                            <div id="canvasSpacer" style="height: 100%; width: 0px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="order-panel">
+                    <div class="panel-title">Order Terminal</div>
+                    
+                    <div class="position-box">
+                        <div class="pos-type-bar" id="pos-type-indicator"></div>
+                        <div>
+                            <div class="stat-label">Position</div>
+                            <div style="font-size: 15px; font-weight:700; margin-top:2px;" id="shares-owned">0 Anteile</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div class="stat-label">Aktueller Kurs</div>
+                            <div style="font-size: 15px; font-weight:700; margin-top:2px;" id="trade-live-price">0,00 €</div>
+                        </div>
+                    </div>
+
+                    <div class="trade-input-group">
+                        <div class="stat-label">Menge (Anteile)</div>
+                        <div class="trade-input-wrapper">
+                            <input type="number" id="order-amount" value="1" min="1" oninput="calculateOrderTotal()">
+                            <span>Stück</span>
+                        </div>
+                        <div class="preset-container">
+                            <button class="preset-btn" onclick="applyAmountPreset(1)">1</button>
+                            <button class="preset-btn" onclick="applyAmountPreset(5)">5</button>
+                            <button class="preset-btn" onclick="applyAmountPreset(10)">10</button>
+                            <button class="preset-btn" onclick="applyAmountPreset(25)">25</button>
+                            <button class="preset-btn" onclick="applyAmountPreset('MAX')">MAX</button>
+                        </div>
+                    </div>
+
+                    <div class="trade-input-group">
+                        <div class="stat-label">Hebelwirkung (Leverage)</div>
+                        <div class="preset-container leverage-container">
+                            <button class="preset-btn lev-btn active" id="lev-1" onclick="selectLeverage(1)">1x</button>
+                            <button class="preset-btn lev-btn" id="lev-2" onclick="selectLeverage(2)">2x</button>
+                            <button class="preset-btn lev-btn" id="lev-3" onclick="selectLeverage(3)">3x</button>
+                            <button class="preset-btn lev-btn" id="lev-4" onclick="selectLeverage(4)">4x</button>
+                        </div>
+                    </div>
+
+                    <div class="sl-tp-grid">
+                        <div class="trade-input-group">
+                            <div class="stat-label">Take Profit</div>
+                            <div class="trade-input-wrapper" style="padding: 8px 12px;">
+                                <input type="number" id="order-tp" placeholder="0.00" step="0.01" oninput="requestChartRedraw()">
+                            </div>
+                        </div>
+                        <div class="trade-input-group">
+                            <div class="stat-label">Stop Loss</div>
+                            <div class="trade-input-wrapper" style="padding: 8px 12px;">
+                                <input type="number" id="order-sl" placeholder="0.00" step="0.01" oninput="requestChartRedraw()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="summary-box">
+                        <div class="order-summary-row">
+                            <span>Preis der Aktie/n:</span>
+                            <span style="font-weight: 700; color: var(--text-main);" id="order-total-value">0,00 €</span>
+                        </div>
+                        <div class="order-summary-row">
+                            <span style="color: var(--text-muted); font-weight: 600;">Benötigtes Geld:</span>
+                            <span style="font-weight: 700; color: #3b82f6;" id="order-margin-cost">0,00 €</span>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="trade-btn btn-buy" onclick="executeOrder('BUY')">Kaufen <span>Go Long</span></button>
+                        <button class="trade-btn btn-sell" onclick="executeOrder('SELL')">Verkaufen <span>Go Short</span></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="toast-container"></div>
+
+    <script>
+        // CORE SYSTEM
+        const INITIAL_CAPITAL = 5000;
+        let wallet = { 
+            cash: INITIAL_CAPITAL, 
+            portfolio: {}, // { ticker: { size, type (LONG/SHORT), avgEntry, margin, leverage, sl, tp } }
+            history: [] // { ticker, type, size, entry, exit, pnl, date }
+        };
+
+        // SETUP STOCKS
+        const TICKERS = ['NXUS', 'VRTX', 'AERO', 'QLOG', 'BIOM', 'SOLR', 'NEON', 'TERA', 'VOID', 'CHIP', 'HYDR', 'FUSN', 'ORBT', 'KRYO', 'DLTA', 'NOVA', 'ZENX', 'PLSM', 'GRVT', 'ECHO', 'LMNX', 'VTRX', 'OXID', 'PYRA', 'STRM'];
+        let stocks = {};
+        
+        TICKERS.forEach(t => {
+            const basePrice = Math.random() * 300 + 20;
+            stocks[t] = { 
+                name: `Company ${t}`, 
+                price: basePrice, 
+                startPrice: basePrice, 
+                history: [], 
+                volatility: Math.random() * 0.2 + 0.1, 
+                momentum: 0,
+                shockCooldown: Math.floor(Math.random() * 80) + 40,
+                shockMomentum: 0
+            };
+            wallet.portfolio[t] = { size: 0, type: null, avgEntry: 0, margin: 0, leverage: 1, sl: null, tp: null };
+        });
+
+        // STATE
+        let currentStockTicker = 'NXUS';
+        let currentView = 'MARKETS'; // MARKETS, HISTORY, TRADING
+        let currentMarketTab = 'ALL';
+        let activeLeverageSelection = 1;
+        
+        let ticksPerCandle = 5;
+        let candleTickCounter = 0;
+        
+        // CANVAS STATE
+        const canvas = document.getElementById('candlestickCanvas');
+        const ctx = canvas.getContext('2d');
+        const BAR_WIDTH = 14;
+        const BAR_SPACING = 10;
+        const CANDLE_TOTAL_WIDTH = BAR_WIDTH + BAR_SPACING;
+        
+        let renderRequested = false;
+        let isDraggingChart = false;
+        let scrollTarget = 0;
+        let gameSpeed = 5;
+        let chartType = 'candles'; // 'candles' oder 'line'
+        let engineIntervalId = null;
+
+        // INIT HISTORY DATA
+        function initStockHistories() {
+            for (let ticker in stocks) {
+                let p = stocks[ticker].price;
+                for (let i = 0; i < 60; i++) {
+                    let change = p * ((Math.random() - 0.5) * (stocks[ticker].volatility / 10));
+                    let o = p; let c = p + change; if(c<0.1) c=0.1;
+                    let h = Math.max(o, c) + (Math.random() * (p * 0.005));
+                    let l = Math.min(o, c) - (Math.random() * (p * 0.005));
+                    stocks[ticker].history.push({ open: o, high: h, low: l, close: c, deals: [] });
+                    p = c;
+                }
+                stocks[ticker].price = p;
+            }
+            buildMarketDOMNodes(); 
+        }
+
+        // TOAST SYSTEM
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            let icon = 'ℹ️';
+            if(type === 'success') icon = '✓';
+            if(type === 'error') icon = '⚠️';
+            
+            toast.innerHTML = `<span>${icon}</span> <div>${message}</div>`;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'fadeOut 0.3s forwards';
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // MARKET & HISTORY UI
+        function switchMainTab(tab) {
+            currentView = tab;
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+            
+            if(tab === 'MARKETS') {
+                document.getElementById('nav-markets').classList.add('active');
+                document.getElementById('view-markets').classList.add('active');
+            } else if (tab === 'HISTORY') {
+                document.getElementById('nav-history').classList.add('active');
+                document.getElementById('view-history').classList.add('active');
+                renderHistory();
+            } else if (tab === 'TRADING') {
+                document.getElementById('trading-view').classList.add('active');
+                setupTradingView();
+            }
+            refreshUI();
+        }
+
+        function changeMarketTab(tab) {
+            currentMarketTab = tab;
+            document.getElementById('tab-all').classList.toggle('active', tab === 'ALL');
+            document.getElementById('tab-owned').classList.toggle('active', tab === 'OWNED');
+            refreshUI();
+        }
+
+        function buildMarketDOMNodes() {
+            const container = document.getElementById('market-list-container');
+            container.innerHTML = '';
+            for (let ticker in stocks) {
+                let row = document.createElement('div');
+                row.className = 'row-card';
+                row.id = `stock-row-${ticker}`;
+                row.onclick = () => { currentStockTicker = ticker; switchMainTab('TRADING'); };
+                row.innerHTML = `
+                    <div class="row-identity"><div class="row-ticker">${ticker} <span id="pos-badge-${ticker}" style="font-size:10px; padding:2px 6px; border-radius:4px; display:none;"></span></div><div class="row-name">${stocks[ticker].name}</div></div>
+                    <div class="row-mini-data"><div class="row-live-price" id="stock-price-${ticker}">0,00 €</div><div class="row-change-badge" id="stock-badge-${ticker}">0,00 %</div></div>
+                `;
+                container.appendChild(row);
+            }
+        }
+
+        function renderHistory() {
+            const container = document.getElementById('history-list-container');
+            const empty = document.getElementById('history-empty-state');
+            container.innerHTML = '';
+            
+            if(wallet.history.length === 0) {
+                empty.style.display = 'block'; return;
+            }
+            empty.style.display = 'none';
+
+            [...wallet.history].reverse().forEach(trade => {
+                let row = document.createElement('div');
+                row.className = 'row-card';
+                row.style.cursor = 'default';
+                let isWin = trade.pnl >= 0;
+                let colorClass = isWin ? 'up' : 'down';
+                let sign = isWin ? '+' : '';
+                
+                row.innerHTML = `
+                    <div class="row-identity">
+                        <div class="row-ticker">${trade.ticker} <span style="font-size:10px; background:${trade.type==='LONG'?'rgba(38,166,154,0.2)':'rgba(239,83,80,0.2)'}; color:${trade.type==='LONG'?'#26a69a':'#ef5350'}; padding:2px 6px; border-radius:4px;">${trade.type}</span></div>
+                        <div class="row-name">${trade.size} Stk. | Entry: ${trade.entry.toFixed(2)} | Exit: ${trade.exit.toFixed(2)}</div>
+                    </div>
+                    <div style="text-align: right; font-weight:700; font-size: 16px;" class="${colorClass}">${sign}${trade.pnl.toFixed(2)} €</div>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        // TRADING VIEW SETUP
+        function setupTradingView() {
+            document.getElementById('chart-ticker').innerText = currentStockTicker;
+            document.getElementById('chart-name').innerText = stocks[currentStockTicker].name;
+            document.getElementById('order-amount').value = 1;
+            document.getElementById('order-sl').value = '';
+            document.getElementById('order-tp').value = '';
+            selectLeverage(1);
+            
+            setTimeout(() => { 
+                resizeCanvas(); 
+                const maxScroll = updateSpacerWidth() - document.getElementById('canvasWrapper').clientWidth;
+                document.getElementById('canvasWrapper').scrollLeft = maxScroll;
+                requestChartRedraw();
+            }, 50);
+        }
+
+        function setGameSpeed(val) {
+            gameSpeed = parseInt(val);
+            document.getElementById('speedValue').innerText = gameSpeed + 'x';
+            const delay = 1100 - gameSpeed * 100; // 1000ms (langsam) bis 100ms (schnell)
+            clearInterval(engineIntervalId);
+            engineIntervalId = setInterval(liveMarketEngine, delay);
+        }
+
+        // SETTINGS MODAL
+        function openSettings() { document.getElementById('settingsOverlay').classList.add('active'); }
+        function closeSettings() { document.getElementById('settingsOverlay').classList.remove('active'); }
+
+        function setTheme(mode) {
+            document.body.classList.toggle('light-mode', mode === 'light');
+            document.getElementById('theme-dark').classList.toggle('active', mode === 'dark');
+            document.getElementById('theme-light').classList.toggle('active', mode === 'light');
+            requestChartRedraw();
+        }
+
+        function setChartType(type) {
+            chartType = type;
+            document.getElementById('chart-candles').classList.toggle('active', type === 'candles');
+            document.getElementById('chart-line').classList.toggle('active', type === 'line');
+            requestChartRedraw();
+        }
+
+        // CALCULATE PNL LOGIC
+        function getPositionPnL(ticker) {
+            const pos = wallet.portfolio[ticker];
+            if (pos.size === 0) return 0;
+            const currentPrice = stocks[ticker].price;
+            if (pos.type === 'LONG') {
+                return (currentPrice - pos.avgEntry) * pos.size;
+            } else {
+                return (pos.avgEntry - currentPrice) * pos.size;
+            }
+        }
+
+        // ENGINE TICK
+        function liveMarketEngine() {
+            candleTickCounter++;
+            let shouldNewCandle = candleTickCounter >= ticksPerCandle;
+            if (shouldNewCandle) candleTickCounter = 0;
+
+            for (let ticker in stocks) {
+                let stock = stocks[ticker];
+                let last = stock.history[stock.history.length - 1];
+
+                // Normale Marktbewegung (Random Walk mit Momentum)
+                stock.momentum = (stock.momentum * 0.8) + ((Math.random() - 0.5) * 0.002);
+
+                // Seltene Spikes/Crashes (Jump-Diffusion) - realistischere "fat tails"
+                stock.shockCooldown--;
+                if (stock.shockCooldown <= 0) {
+                    stock.shockCooldown = Math.floor(Math.random() * 250) + 90;
+                    // Crashes etwas wahrscheinlicher & härter als Spikes (wie an echten Märkten)
+                    const isCrash = Math.random() < 0.58;
+                    const magnitude = (Math.random() * 0.05 + (isCrash ? 0.05 : 0.035));
+                    stock.shockMomentum = isCrash ? -magnitude : magnitude;
+                    if (ticker === currentStockTicker && currentView === 'TRADING') {
+                        showToast(`${isCrash ? '⚠ Crash' : '🚀 Spike'} bei ${ticker}!`, isCrash ? 'error' : 'success');
+                    }
+                }
+                // Nachbeben: Schock klingt über mehrere Ticks ab statt sofort zu wirken
+                let shockDelta = 0;
+                if (Math.abs(stock.shockMomentum) > 0.0005) {
+                    shockDelta = stock.shockMomentum;
+                    stock.shockMomentum *= 0.55;
+                } else {
+                    stock.shockMomentum = 0;
+                }
+
+                let priceDelta = stock.price * (stock.momentum + shockDelta + (Math.random() - 0.5) * (stock.volatility / 16)); 
+                let newPrice = Math.max(0.01, stock.price + priceDelta);
+
+                last.close = newPrice;
+                if (newPrice > last.high) last.high = newPrice;
+                if (newPrice < last.low) last.low = newPrice;
+                stock.price = newPrice;
+
+                // SL, TP & MARGIN CHECK
+                let pos = wallet.portfolio[ticker];
+                if (pos.size > 0) {
+                    let pnl = getPositionPnL(ticker);
+                    
+                    // Margin Call
+                    if (pos.margin + pnl <= 0) {
+                        closePosition(ticker, newPrice, 'LIQUIDATION');
+                        showToast(`Margin Call bei ${ticker}! Position aufgelöst.`, 'error');
+                        continue;
+                    }
+
+                    // Take Profit
+                    if (pos.tp !== null) {
+                        if ((pos.type === 'LONG' && newPrice >= pos.tp) || (pos.type === 'SHORT' && newPrice <= pos.tp)) {
+                            closePosition(ticker, newPrice, 'TAKE PROFIT');
+                            showToast(`Take Profit bei ${ticker} erreicht!`, 'success');
+                            continue;
+                        }
+                    }
+
+                    // Stop Loss
+                    if (pos.sl !== null) {
+                        if ((pos.type === 'LONG' && newPrice <= pos.sl) || (pos.type === 'SHORT' && newPrice >= pos.sl)) {
+                            closePosition(ticker, newPrice, 'STOP LOSS');
+                            showToast(`Stop Loss bei ${ticker} ausgelöst.`, 'error');
+                            continue;
+                        }
+                    }
+                }
+
+                if (shouldNewCandle) {
+                    if (stock.history.length > 150) stock.history.shift(); 
+                    stock.history.push({ open: stock.price, high: stock.price, low: stock.price, close: stock.price, deals: [] });
+                }
+            }
+
+            if (currentView === 'TRADING') {
+                if(shouldNewCandle && !isDraggingChart) {
+                    const wrapper = document.getElementById('canvasWrapper');
+                    if(wrapper.scrollWidth - wrapper.scrollLeft - wrapper.clientWidth < 30) {
+                        setTimeout(() => wrapper.scrollLeft = wrapper.scrollWidth, 0);
+                    }
+                }
+                updateSpacerWidth();
+                requestChartRedraw();
+                calculateOrderTotal();
+            }
+            refreshUI();
+        }
+
+        // ORDER EXECUTION
+        function executeOrder(action) {
+            const amount = parseInt(document.getElementById('order-amount').value);
+            if (isNaN(amount) || amount <= 0) return;
+            
+            let slInput = parseFloat(document.getElementById('order-sl').value);
+            let tpInput = parseFloat(document.getElementById('order-tp').value);
+            let sl = isNaN(slInput) ? null : slInput;
+            let tp = isNaN(tpInput) ? null : tpInput;
+
+            let pos = wallet.portfolio[currentStockTicker];
+            let price = stocks[currentStockTicker].price;
+            
+            // ACTION LOGIC (Buy = Go Long / Close Short, Sell = Go Short / Close Long)
+            if (pos.size > 0) {
+                if ((action === 'BUY' && pos.type === 'SHORT') || (action === 'SELL' && pos.type === 'LONG')) {
+                    if (amount === pos.size) {
+                        closePosition(currentStockTicker, price, 'MANUAL');
+                        showToast(`Position komplett geschlossen.`, 'info');
+                    } else if (amount < pos.size) {
+                        partialClose(currentStockTicker, amount, price);
+                        showToast(`${amount} Anteile geschlossen.`, 'info');
+                    } else {
+                        // Reverse position
+                        closePosition(currentStockTicker, price, 'REVERSE');
+                        openPosition(currentStockTicker, amount - pos.size, price, action === 'BUY' ? 'LONG' : 'SHORT', sl, tp);
+                        showToast(`Position gedreht auf ${action === 'BUY' ? 'LONG' : 'SHORT'}.`, 'success');
+                    }
+                    requestChartRedraw();
+                    return;
+                }
+            }
+
+            // Open or Add to position
+            let intentType = action === 'BUY' ? 'LONG' : 'SHORT';
+            openPosition(currentStockTicker, amount, price, intentType, sl, tp);
+            requestChartRedraw();
+        }
+
+        function openPosition(ticker, amount, price, type, sl, tp) {
+            let requiredMargin = (price * amount) / activeLeverageSelection;
+            if (wallet.cash < requiredMargin) {
+                showToast('Nicht genügend Cash verfügbar!', 'error'); return;
+            }
+
+            let pos = wallet.portfolio[ticker];
+            wallet.cash -= requiredMargin;
+
+            if (pos.size === 0) {
+                pos.type = type;
+                pos.size = amount;
+                pos.avgEntry = price;
+                pos.margin = requiredMargin;
+                pos.leverage = activeLeverageSelection;
+            } else {
+                // Averaging in
+                pos.avgEntry = ((pos.avgEntry * pos.size) + (price * amount)) / (pos.size + amount);
+                pos.size += amount;
+                pos.margin += requiredMargin;
+                pos.leverage = (pos.avgEntry * pos.size) / pos.margin; // recalculate effective leverage
+            }
+            
+            pos.sl = sl; 
+            pos.tp = tp;
+
+            stocks[ticker].history[stocks[ticker].history.length - 1].deals.push(makeDeal(ticker, actionToDeal(type), price));
+            showToast(`${amount}x ${ticker} ${type} eröffnet!`, 'success');
+        }
+
+        function closePosition(ticker, exitPrice, reason) {
+            let pos = wallet.portfolio[ticker];
+            if(pos.size === 0) return;
+            
+            let pnl = getPositionPnL(ticker);
+            wallet.cash += (pos.margin + pnl);
+            
+            wallet.history.push({ ticker, type: pos.type, size: pos.size, entry: pos.avgEntry, exit: exitPrice, pnl, time: new Date() });
+            stocks[ticker].history[stocks[ticker].history.length - 1].deals.push(makeDeal(ticker, actionToDealInverse(pos.type), exitPrice));
+            
+            wallet.portfolio[ticker] = { size: 0, type: null, avgEntry: 0, margin: 0, leverage: 1, sl: null, tp: null };
+        }
+
+        function partialClose(ticker, amount, exitPrice) {
+            let pos = wallet.portfolio[ticker];
+            let fraction = amount / pos.size;
+            let releasedMargin = pos.margin * fraction;
+            
+            let pnlPerShare = pos.type === 'LONG' ? (exitPrice - pos.avgEntry) : (pos.avgEntry - exitPrice);
+            let realizedPnL = pnlPerShare * amount;
+
+            wallet.cash += (releasedMargin + realizedPnL);
+            pos.margin -= releasedMargin;
+            pos.size -= amount;
+
+            wallet.history.push({ ticker, type: pos.type, size: amount, entry: pos.avgEntry, exit: exitPrice, pnl: realizedPnL, time: new Date() });
+            stocks[ticker].history[stocks[ticker].history.length - 1].deals.push(makeDeal(ticker, actionToDealInverse(pos.type), exitPrice));
+        }
+
+        // Erzeugt ein Deal-Objekt mit eingefrorener Linien-Position (für den Linien-Modus),
+        // damit der Punkt sich später nie wieder bewegt - egal ob die Kerze noch läuft oder schon fixiert ist.
+        function makeDeal(ticker, type, price) {
+            const hist = stocks[ticker].history;
+            const liveIdx = hist.length - 1;
+            const fixedIdx = liveIdx - 1; // letzte bereits abgeschlossene Kerze
+            const lineIndex = fixedIdx >= 0 ? fixedIdx : 0;
+            const linePrice = fixedIdx >= 0 ? hist[fixedIdx].close : hist[liveIdx].open;
+            return { type, price, lineIndex, linePrice };
+        }
+
+        function actionToDeal(type) { return type === 'LONG' ? 'BUY' : 'SELL'; }
+        function actionToDealInverse(type) { return type === 'LONG' ? 'SELL' : 'BUY'; }
+
+        // UI HELPERS
+        function applyAmountPreset(val) {
+            const input = document.getElementById('order-amount');
+            if (val === 'MAX') {
+                input.value = Math.max(1, Math.floor((wallet.cash * activeLeverageSelection) / stocks[currentStockTicker].price));
+            } else { input.value = val; }
+            calculateOrderTotal();
+        }
+
+        function selectLeverage(lev) {
+            activeLeverageSelection = lev;
+            document.querySelectorAll('.lev-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`lev-${lev}`).classList.add('active');
+            calculateOrderTotal();
+        }
+
+        function calculateOrderTotal() {
+            let amount = parseInt(document.getElementById('order-amount').value) || 0;
+            let total = stocks[currentStockTicker].price * amount;
+            document.getElementById('order-total-value').innerText = total.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
+            document.getElementById('order-margin-cost').innerText = (total / activeLeverageSelection).toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
+        }
+
+        function refreshUI() {
+            document.getElementById('global-cash').innerText = wallet.cash.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+
+            // Gesamtrendite: immer aktualisieren (Navbar ist view-unabhängig sichtbar) und
+            // konsistent aus Gesamtvermögen (Cash + offene Positionen) vs. Startkapital berechnen,
+            // damit € und % immer zusammenpassen und auch geschlossene Trades einfließen.
+            {
+                let totalMargin = 0; let totalPnL = 0;
+                for (let t in wallet.portfolio) {
+                    let pos = wallet.portfolio[t];
+                    if (pos.size > 0) {
+                        totalPnL += getPositionPnL(t);
+                        totalMargin += pos.margin;
+                    }
+                }
+                let totalWealth = wallet.cash + totalMargin + totalPnL;
+                let totalDiff = totalWealth - INITIAL_CAPITAL;
+                let totalPct = (totalDiff / INITIAL_CAPITAL) * 100;
+
+                let valEl = document.getElementById('dynamic-perf-value');
+                valEl.innerText = `${totalDiff >= 0 ? '+' : ''}${totalDiff.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2})} € (${totalPct >= 0 ? '+' : ''}${totalPct.toFixed(2)}%)`;
+                valEl.className = `stat-value ${totalDiff > 0.1 ? 'up' : (totalDiff < -0.1 ? 'down' : '')}`;
+            }
+
+            if (currentView === 'MARKETS') {
+                let visible = 0;
+                for (let ticker in stocks) {
+                    let row = document.getElementById(`stock-row-${ticker}`);
+                    let pos = wallet.portfolio[ticker];
+                    
+                    if (currentMarketTab === 'OWNED' && pos.size === 0) { row.style.display = 'none'; continue; }
+                    row.style.display = 'flex'; visible++;
+
+                    let s = stocks[ticker];
+                    let chg = ((s.price - s.startPrice) / s.startPrice) * 100;
+                    
+                    let pEl = document.getElementById(`stock-price-${ticker}`);
+                    pEl.innerText = s.price.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
+                    pEl.className = `row-live-price ${chg >= 0 ? 'up' : 'down'}`;
+                    
+                    let bEl = document.getElementById(`stock-badge-${ticker}`);
+                    bEl.innerText = `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`;
+                    bEl.className = `row-change-badge ${chg >= 0 ? 'badge-up' : 'badge-down'}`;
+
+                    let posBadge = document.getElementById(`pos-badge-${ticker}`);
+                    if(pos.size > 0) {
+                        posBadge.style.display = 'inline-block';
+                        posBadge.innerText = `${pos.type} x${pos.leverage.toFixed(0)}`;
+                        posBadge.style.background = pos.type === 'LONG' ? 'rgba(38,166,154,0.2)' : 'rgba(239,83,80,0.2)';
+                        posBadge.style.color = pos.type === 'LONG' ? '#26a69a' : '#ef5350';
+                    } else { posBadge.style.display = 'none'; }
+                }
+                document.getElementById('market-empty-state').style.display = (visible === 0 && currentMarketTab === 'OWNED') ? 'block' : 'none';
+
+            } else if (currentView === 'TRADING') {
+                let pos = wallet.portfolio[currentStockTicker];
+                let pEl = document.getElementById('trade-live-price');
+                pEl.innerText = stocks[currentStockTicker].price.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
+                
+                let so = document.getElementById('shares-owned');
+                let indicator = document.getElementById('pos-type-indicator');
+                
+                if (pos.size > 0) {
+                    let pnl = getPositionPnL(currentStockTicker);
+                    let pnlStr = `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} €`;
+                    so.innerHTML = `${pos.size} Stk. <span class="${pnl >= 0 ? 'up' : 'down'}">(${pnlStr})</span>`;
+                    indicator.className = `pos-type-bar ${pos.type}`;
+                    pEl.className = pnl >= 0 ? 'up' : 'down';
+                } else {
+                    so.innerText = "0 Anteile";
+                    indicator.className = "pos-type-bar";
+                    pEl.className = "";
+                }
+            }
+        }
+
+        // CANVAS DRAWING
+        function resizeCanvas() {
+            if (currentView !== 'TRADING') return;
+            const dpr = window.devicePixelRatio || 1;
+            const wrapper = document.getElementById('canvasWrapper');
+            const targetWidth = Math.floor(wrapper.clientWidth * dpr);
+            const targetHeight = Math.floor(wrapper.clientHeight * dpr);
+
+            if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+                canvas.width = targetWidth; canvas.style.width = wrapper.clientWidth + 'px';
+                canvas.height = targetHeight; canvas.style.height = wrapper.clientHeight + 'px';
+                ctx.scale(dpr, dpr);
+            }
+        }
+
+        function updateSpacerWidth() {
+            const wrapper = document.getElementById('canvasWrapper');
+            const totalW = stocks[currentStockTicker].history.length * CANDLE_TOTAL_WIDTH + 60; 
+            const calcW = Math.max(wrapper.clientWidth, totalW);
+            document.getElementById('canvasSpacer').style.width = calcW + 'px';
+            return calcW;
+        }
+
+        function requestChartRedraw() {
+            if (!renderRequested) { renderRequested = true; requestAnimationFrame(() => { drawCandlesticks(); renderRequested = false; }); }
+        }
+
+        function handleChartScroll() {
+            requestChartRedraw();
+        }
+
+        function drawCandlesticks() {
+            if (currentView !== 'TRADING') return;
+            const wrapper = document.getElementById('canvasWrapper');
+            const w = wrapper.clientWidth; const h = wrapper.clientHeight; const sL = wrapper.scrollLeft;
+            const history = stocks[currentStockTicker].history;
+            
+            ctx.clearRect(0, 0, w, h);
+            if (history.length === 0) return;
+
+            const styles = getComputedStyle(document.documentElement);
+            const colGreen = styles.getPropertyValue('--candle-green').trim() || '#26a69a';
+            const colRed = styles.getPropertyValue('--candle-red').trim() || '#ef5350';
+            const colGrid = styles.getPropertyValue('--border-color').trim() || '#141a26';
+            const colMuted = styles.getPropertyValue('--text-muted').trim() || '#475569';
+
+            // Take-Profit / Stop-Loss Werte ermitteln (vor der Range-Berechnung, damit
+            // der Chart automatisch rauszoomt und die Linien immer sichtbar sind).
+            // Ist bereits eine Position offen, wird deren tatsächliches TP/SL angezeigt.
+            // Ansonsten dient die Eingabe im Order-Formular als Live-Vorschau.
+            const posForLines = wallet.portfolio[currentStockTicker];
+            let tpValue = null, slValue = null;
+            if (posForLines && posForLines.size > 0) {
+                tpValue = posForLines.tp;
+                slValue = posForLines.sl;
+            } else {
+                const tpInputEl = document.getElementById('order-tp');
+                const slInputEl = document.getElementById('order-sl');
+                const tpParsed = parseFloat(tpInputEl.value);
+                const slParsed = parseFloat(slInputEl.value);
+                if (!isNaN(tpParsed) && tpParsed > 0) tpValue = tpParsed;
+                if (!isNaN(slParsed) && slParsed > 0) slValue = slParsed;
+            }
+
+            let maxV = Math.max(...history.map(c => c.high));
+            let minV = Math.min(...history.map(c => c.low));
+            if (tpValue !== null) { maxV = Math.max(maxV, tpValue); minV = Math.min(minV, tpValue); }
+            if (slValue !== null) { maxV = Math.max(maxV, slValue); minV = Math.min(minV, slValue); }
+            const pad = (maxV - minV) * 0.08 || stocks[currentStockTicker].price * 0.02;
+            maxV += pad; minV -= pad;
+
+            const getX = i => i * CANDLE_TOTAL_WIDTH + 10 - sL;
+            const getY = v => h - ((v - minV) / (maxV - minV)) * h;
+
+            // BG Grid
+            ctx.strokeStyle = colGrid; ctx.lineWidth = 1;
+            for(let i=1; i<5; i++) { ctx.beginPath(); ctx.moveTo(0, h/5*i); ctx.lineTo(w, h/5*i); ctx.stroke(); }
+
+            if (chartType === 'line') {
+                // LINE CHART - nur abgeschlossene (fixierte) Kerzen, die aktuell laufende Kerze
+                // wird ausgeklammert, damit die Linie nicht wie die Kerzen live "wackelt"
+                const fixedHistory = history.length > 1 ? history.slice(0, -1) : history;
+
+                ctx.beginPath();
+                let started = false;
+                fixedHistory.forEach((c, i) => {
+                    const x = getX(i) + BAR_WIDTH/2;
+                    if (x < -20 || x > w + 20) return;
+                    const y = getY(c.close);
+                    if (!started) { ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
+                });
+                const pos = wallet.portfolio[currentStockTicker];
+                const currentPrice = stocks[currentStockTicker].price;
+                const colNeutral = styles.getPropertyValue('--chart-neutral').trim() || '#cbd5e1';
+                let lineCol = colNeutral;
+                if (pos && pos.size > 0) {
+                    const isProfit = pos.type === 'LONG' ? currentPrice >= pos.avgEntry : currentPrice <= pos.avgEntry;
+                    lineCol = isProfit ? colGreen : colRed;
+                }
+                ctx.strokeStyle = lineCol; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+
+                // Flächenfüllung unter der Linie
+                ctx.lineTo(getX(fixedHistory.length-1) + BAR_WIDTH/2, h);
+                ctx.lineTo(getX(0) + BAR_WIDTH/2, h);
+                ctx.closePath();
+                const gradient = ctx.createLinearGradient(0, 0, 0, h);
+                gradient.addColorStop(0, lineCol + '33');
+                gradient.addColorStop(1, lineCol + '00');
+                ctx.fillStyle = gradient; ctx.fill();
+
+                // Deal-Marker - nutzen die beim Kauf/Verkauf eingefrorene Linien-Position,
+                // damit sie sich nie wieder bewegen (anders als im Kerzen-Modus mit echtem Deal-Preis)
+                history.forEach(c => {
+                    if (!c.deals) return;
+                    c.deals.forEach(d => {
+                        const x = getX(d.lineIndex) + BAR_WIDTH/2;
+                        if (x < -20 || x > w + 20) return;
+                        const dy = getY(d.linePrice);
+                        ctx.fillStyle = d.type === 'BUY' ? colGreen : colRed;
+                        ctx.beginPath(); ctx.arc(x, dy, 4, 0, 2*Math.PI); ctx.fill();
+                        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+                    });
+                });
+            } else {
+                // CANDLESTICK CHART
+                history.forEach((c, i) => {
+                    const x = getX(i);
+                    if (x+BAR_WIDTH < 0 || x > w) return;
+
+                    const yO = getY(c.open); const yC = getY(c.close);
+                    const col = c.close >= c.open ? colGreen : colRed;
+                    ctx.fillStyle = ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+
+                    ctx.beginPath(); ctx.moveTo(x + BAR_WIDTH/2, getY(c.high)); ctx.lineTo(x + BAR_WIDTH/2, getY(c.low)); ctx.stroke();
+                    ctx.fillRect(x, Math.min(yO, yC), BAR_WIDTH, Math.max(1, Math.abs(yC - yO)));
+
+                    if(c.deals) c.deals.forEach(d => {
+                        let dy = getY(d.price); let cx = x + BAR_WIDTH/2;
+                        ctx.fillStyle = d.type === 'BUY' ? colGreen : colRed;
+                        ctx.beginPath(); ctx.arc(cx, dy, 4, 0, 2*Math.PI); ctx.fill();
+                        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+                    });
+                });
+            }
+
+            // Live Line (nur im Kerzen-Modus)
+            if (chartType !== 'line') {
+                const currY = getY(stocks[currentStockTicker].price);
+                ctx.strokeStyle = colMuted; ctx.setLineDash([4, 4]);
+                ctx.beginPath(); ctx.moveTo(0, currY); ctx.lineTo(w, currY); ctx.stroke(); ctx.setLineDash([]);
+            }
+
+            // Take-Profit / Stop-Loss Linien zeichnen (Werte wurden bereits oben ermittelt)
+            const drawLevelLine = (value, color, label) => {
+                if (value === null || value === undefined) return;
+                const y = getY(value);
+                if (y < -20 || y > h + 20) return;
+                ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); ctx.setLineDash([]);
+
+                const text = `${label} ${value.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+                ctx.font = '11px sans-serif';
+                const textW = ctx.measureText(text).width;
+                ctx.fillStyle = color;
+                ctx.fillRect(w - textW - 14, y - 10, textW + 14, 20);
+                ctx.fillStyle = '#fff';
+                ctx.fillText(text, w - textW - 7, y + 4);
+            };
+            drawLevelLine(tpValue, colGreen, 'TP');
+            drawLevelLine(slValue, colRed, 'SL');
+        }
+
+        // CHART INTERACTIONS (Mouse/Touch)
+        const wrapper = document.getElementById('canvasWrapper');
+        
+        let startX, scrollStart;
+        wrapper.addEventListener('mousedown', e => { isDraggingChart = true; wrapper.style.cursor = 'grabbing'; startX = e.pageX; scrollStart = wrapper.scrollLeft; });
+        window.addEventListener('mouseup', () => { isDraggingChart = false; wrapper.style.cursor = 'grab'; });
+        wrapper.addEventListener('mousemove', e => {
+            if(!isDraggingChart) return;
+            wrapper.scrollLeft = scrollStart - (e.pageX - startX) * 1.5;
+        });
+
+        // INIT
+        window.addEventListener('resize', resizeCanvas);
+        initStockHistories();
+        switchMainTab('MARKETS');
+        setGameSpeed(gameSpeed); // Startet die Engine mit der Standard-Geschwindigkeit
+    </script>
+</body>
+</html>
